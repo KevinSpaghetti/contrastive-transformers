@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
-from torch.linalg import norm
 import torch.nn.functional as F
+
+from torch.linalg import norm
 
 class NormalizedCrossEntropyLoss(nn.Module):
     
@@ -51,10 +51,6 @@ class SupConLoss(nn.Module):
             for col in cols:
                 denom = torch.sum(distances[i] * ~positive_mat[i])
                 sms[i] += torch.log(distances[i, col[0]] / (distances[i, col[0]] + denom))
-
-        #print((torch.log(distances) * positive_mat))
-        #print((torch.log(torch.sum(distances * ~positive_mat, axis=1))))
-        #print(log_ratio)
 
         l_sup = torch.sum(norm * sms)
         return l_sup
