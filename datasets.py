@@ -2,7 +2,8 @@ from datasets import Dataset
 import pandas as pd
 import random
 
-from collections.abs import Sequence, Iterable, Hashable
+from collections.abc import Sequence, Iterable, Hashable
+from collections import defaultdict
 
 class AutoAugmentDataset(Dataset):
     '''
@@ -18,7 +19,7 @@ class AutoAugmentDataset(Dataset):
         'negative': ...,  }
     '''
 
-    def __init__(self, examples: Sequence, labels: Sequence[Hashable], return_negative: bool = True, return_labels: bool = True):
+    def __init__(self, examples: Sequence, labels: Sequence, return_negative: bool = True, return_labels: bool = True):
         """ Inits the dataset from a pandas dataframe, positives will be drawn
         from positives with the same anchor value, negatives will be drawn from 
         examples with other anchor values
@@ -29,10 +30,8 @@ class AutoAugmentDataset(Dataset):
             return_negative (bool): whether to return negatives in the pair
             return_labels (bool): whether to return the label associated with the positive and negative examples            
         """
-
-        assert not (return_negative == False and return_negative_anchor == True), "Return anchor is only permitted when returning negatives"
-             
-        self.examples = list(positives)
+       
+        self.examples = list(examples)
         self.labels = list(labels)
 
         self.return_negative = return_negative
@@ -47,12 +46,12 @@ class AutoAugmentDataset(Dataset):
     def __len__(self):
         return len(self.examples)
 
-    def get_positive(self, anchor)
+    def get_positive(self, anchor):
         '''Get positive for an anchor'''
         pos_idx = random.choice(self._positive_indices_for_label[anchor])
         return self.examples[pos_idx]
 
-    def get_negative(self, anchor)
+    def get_negative(self, anchor):
         '''Get a negative example for an anchor, also returns the negative_anchor'''
         # Rejection sampling for negative sampling
         neg_idx = random.randrange(0, len(self))
@@ -62,16 +61,16 @@ class AutoAugmentDataset(Dataset):
         return (self.labels[neg_idx], self.examples[neg_idx]) 
 
     def __getitem__(self, idx):
-        anchor = self.examples[idx]
-
+        anchor, label = self.examples[idx], self.labels[idx]
+        
         result = {
             'anchor': anchor,
-            'positive': self.get_positive(anchor)
+            'positive': self.get_positive(label)
         }
         
-        if self.return_labels: result['label'] = self.labels[idx]
+        if self.return_labels: result['label'] = label
 
-        if not return_negative:
+        if not self.return_negative:
             return result
 
         neg_label, neg_example = self.get_negative(anchor)
@@ -81,4 +80,34 @@ class AutoAugmentDataset(Dataset):
 
         return result
 
+class DatasetWithPositives(Dataset):
+
+    def __init__(self, examples: Sequence, labels: Sequence, positives: Sequence, return_labels: bool = True):
+ 
+        self.examples = list(examples)
+        self.positives = list(positives)
+        self.labels = list(labels)
+
+        self.return_labels = return_labels
+
+        # to speed up positive search collect indices in examples list
+        # speeds up positive and negative sampling 
+        self.positives_for_example = defaultdict(list)
+        for index, (example, positive) in enumerate(zip(self.examples, self.positives)):
+            self.positives_for_example[example].append(positive)
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, idx):
+        anchor, label = self.examples[idx], self.labels[idx]
+        positive = random.choice(self.positives_for_example[anchor])
         
+        result = {
+            'anchor': anchor,
+            'positive': positive
+        }
+        
+        if self.return_labels: result['label'] = label
+        return result
+
